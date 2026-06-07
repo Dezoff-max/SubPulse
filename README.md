@@ -4,6 +4,27 @@ SubPulse is a native macOS 14+ SwiftUI app for tracking subscriptions, recurring
 
 Landing page: https://subpulse.netlify.app
 
+## Screenshots
+
+<table>
+  <tr>
+    <td>
+      <img src="landing/public/assets/gallery/dashboard-light.png" alt="SubPulse dashboard in light Soft Neumorphic theme" width="420">
+    </td>
+    <td>
+      <img src="landing/public/assets/gallery/dashboard-dark.png" alt="SubPulse dashboard in dark Soft Neumorphic theme" width="420">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src="landing/public/assets/gallery/subscriptions-list.png" alt="SubPulse subscriptions list" width="420">
+    </td>
+    <td>
+      <img src="landing/public/assets/gallery/analytics-view.png" alt="SubPulse analytics screen" width="420">
+    </td>
+  </tr>
+</table>
+
 ## Tech Stack
 
 - Swift, SwiftUI, SwiftData
