@@ -3,23 +3,106 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#edf1f6" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="SubPulse" />
+    <meta name="apple-mobile-web-app-title" content="SubPulse" />
+    <meta name="author" content="@Rootoff" />
     <meta
       name="description"
-      content="SubPulse is a local-first macOS subscription calendar with analytics, reminders, currencies, and a soft neumorphic interface."
+      content="SubPulse is a free local-first macOS app for tracking subscriptions, renewal dates, recurring payments, currencies, reminders, and spending analytics."
     />
-    <meta property="og:title" content="SubPulse — subscription calendar for macOS" />
+    <link rel="canonical" href="https://subpulse.netlify.app/" />
+    <meta property="og:site_name" content="SubPulse" />
+    <meta property="og:title" content="SubPulse for macOS — subscription calendar and spending analytics" />
     <meta
       property="og:description"
-      content="Track recurring payments, see renewal calendars, and review spending analytics locally on your Mac."
+      content="Track subscriptions, renewal dates, recurring payments, reminders, and spending analytics locally on your Mac."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/assets/subpulse-dashboard.png" />
+    <meta property="og:url" content="https://subpulse.netlify.app/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="ru_RU" />
+    <meta property="og:image" content="https://subpulse.netlify.app/assets/subpulse-dashboard.png" />
+    <meta property="og:image:width" content="2240" />
+    <meta property="og:image:height" content="1640" />
+    <meta property="og:image:alt" content="SubPulse macOS subscription calendar dashboard" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SubPulse for macOS — subscription calendar" />
+    <meta
+      name="twitter:description"
+      content="A free local-first macOS app for subscriptions, renewal reminders, currencies, and expense analytics."
+    />
+    <meta name="twitter:image" content="https://subpulse.netlify.app/assets/subpulse-dashboard.png" />
     <link rel="icon" href="/assets/subpulse-app-icon.png" />
-    <title>SubPulse — subscription calendar for macOS</title>
+    <link rel="apple-touch-icon" href="/assets/subpulse-app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://subpulse.netlify.app/#website",
+            "name": "SubPulse",
+            "url": "https://subpulse.netlify.app/",
+            "inLanguage": ["en", "ru"],
+            "description": "SubPulse is a local-first macOS subscription calendar for recurring payments, reminders, currencies, and spending analytics."
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://subpulse.netlify.app/#software",
+            "name": "SubPulse",
+            "alternateName": "SubPulse Calendar",
+            "url": "https://subpulse.netlify.app/",
+            "downloadUrl": "https://subpulse.netlify.app/api/download",
+            "image": "https://subpulse.netlify.app/assets/subpulse-dashboard.png",
+            "screenshot": [
+              "https://subpulse.netlify.app/assets/gallery/dashboard-light.png",
+              "https://subpulse.netlify.app/assets/gallery/dashboard-dark.png",
+              "https://subpulse.netlify.app/assets/gallery/subscriptions-list.png",
+              "https://subpulse.netlify.app/assets/gallery/analytics-view.png"
+            ],
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "macOS 14+",
+            "softwareVersion": "0.2.0",
+            "isAccessibleForFree": true,
+            "sameAs": "https://github.com/Dezoff-max/SubPulse",
+            "author": {
+              "@type": "Person",
+              "name": "Rootoff",
+              "url": "https://github.com/Dezoff-max"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "description": "A free local-first macOS app for tracking subscriptions, renewal dates, recurring payments, currencies, reminders, and spending analytics."
+          }
+        ]
+      }
+    </script>
+    <title>SubPulse for macOS - Subscription Calendar, Reminders & Analytics</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>SubPulse for macOS</h1>
+        <p>
+          SubPulse is a free local-first macOS subscription calendar for tracking recurring payments,
+          renewal dates, currencies, reminders, and spending analytics.
+        </p>
+        <p>
+          Download SubPulse from
+          <a href="https://subpulse.netlify.app/api/download">subpulse.netlify.app</a>
+          or view the source code on
+          <a href="https://github.com/Dezoff-max/SubPulse">GitHub</a>.
+        </p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
