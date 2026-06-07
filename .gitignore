@@ -1,0 +1,11 @@
+.DS_Store
+.codex/
+.build/
+dist/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+landing/.netlify/
+landing/dist/
+landing/node_modules/
