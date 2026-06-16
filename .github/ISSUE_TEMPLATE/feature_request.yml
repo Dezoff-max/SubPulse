@@ -1,0 +1,40 @@
+name: Feature Request
+description: Suggest an app, analytics, backup, reminder, or landing page improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User Problem
+      description: What subscription-tracking workflow would this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the behavior, screen, export, reminder, or landing page change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - subscriptions
+        - analytics
+        - reminders
+        - backup and restore
+        - import
+        - privacy
+        - landing page
+        - release workflow
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy Considerations
+      description: What private data could this store, show, export, or send over the network?
