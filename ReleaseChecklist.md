@@ -7,7 +7,7 @@ Use this checklist before sharing SubPulse outside your own Mac.
 - Set the marketing version if needed:
 
 ```bash
-APP_VERSION=0.2.0 ./script/build_and_run.sh --build
+APP_VERSION=0.3.0 ./script/build_and_run.sh --build
 ```
 
 - The build number increases automatically in `.build/subpulse-build-number`.

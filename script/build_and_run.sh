@@ -5,8 +5,10 @@ MODE="${1:-run}"
 PRODUCT_NAME="SubPulse"
 APP_NAME="SubPulse"
 BUNDLE_ID="com.subpulse.app"
+WIDGET_PRODUCT_NAME="SubPulseWidgets"
+WIDGET_BUNDLE_ID="com.subpulse.app.widgets"
 MIN_SYSTEM_VERSION="14.0"
-APP_VERSION="${APP_VERSION:-0.2.0}"
+APP_VERSION="${APP_VERSION:-0.3.0}"
 BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,9 +17,16 @@ APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_PLUGINS="$APP_CONTENTS/PlugIns"
 APP_BINARY="$APP_MACOS/$PRODUCT_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON="$ROOT_DIR/Resources/AppIcon.icns"
+WIDGET_BUNDLE="$APP_PLUGINS/$WIDGET_PRODUCT_NAME.appex"
+WIDGET_CONTENTS="$WIDGET_BUNDLE/Contents"
+WIDGET_MACOS="$WIDGET_CONTENTS/MacOS"
+WIDGET_INFO_PLIST="$WIDGET_CONTENTS/Info.plist"
+WIDGET_BINARY="$WIDGET_MACOS/$WIDGET_PRODUCT_NAME"
+WIDGET_ENTITLEMENTS="$ROOT_DIR/Config/SubPulseWidgets.entitlements"
 BUILD_NUMBER_FILE="${BUILD_NUMBER_FILE:-$ROOT_DIR/.build/subpulse-build-number}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 
@@ -31,11 +40,50 @@ clean_bundle_xattrs() {
 
 sign_app_bundle() {
   local bundle_path="$1"
+  local entitlements_path="${2:-}"
+  local deep_flag="${3:-deep}"
+
   if [ "$CODE_SIGN_IDENTITY" = "-" ]; then
-    codesign --force --deep --sign - "$bundle_path"
+    if [ -n "$entitlements_path" ] && [ -f "$entitlements_path" ]; then
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --sign - --entitlements "$entitlements_path" "$bundle_path"
+      else
+        codesign --force --sign - --entitlements "$entitlements_path" "$bundle_path"
+      fi
+    else
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --sign - "$bundle_path"
+      else
+        codesign --force --sign - "$bundle_path"
+      fi
+    fi
   else
-    codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+    if [ -n "$entitlements_path" ] && [ -f "$entitlements_path" ]; then
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" --entitlements "$entitlements_path" "$bundle_path"
+      else
+        codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" --entitlements "$entitlements_path" "$bundle_path"
+      fi
+    else
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+      else
+        codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+      fi
+    fi
   fi
+}
+
+verify_app_bundle() {
+  local bundle_path="$1"
+  local verify_dir
+  verify_dir="$(mktemp -d /tmp/subpulse-verify.XXXXXX)"
+  local verify_bundle="$verify_dir/$(basename "$bundle_path")"
+
+  ditto --norsrc --noextattr --noacl "$bundle_path" "$verify_bundle"
+  clean_bundle_xattrs "$verify_bundle"
+  codesign --verify --deep --strict --verbose=2 "$verify_bundle"
+  rm -rf "$verify_dir"
 }
 
 if [ -z "${APP_BUILD:-}" ]; then
@@ -61,13 +109,18 @@ while IFS= read -r pid; do
   fi
 done < <(pgrep -x "$PRODUCT_NAME" || true)
 
-swift build -c "$BUILD_CONFIGURATION"
-BUILD_BINARY="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)/$PRODUCT_NAME"
+swift build -c "$BUILD_CONFIGURATION" --product "$PRODUCT_NAME"
+swift build -c "$BUILD_CONFIGURATION" --product "$WIDGET_PRODUCT_NAME"
+BUILD_DIR="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)"
+BUILD_BINARY="$BUILD_DIR/$PRODUCT_NAME"
+BUILD_WIDGET_BINARY="$BUILD_DIR/$WIDGET_PRODUCT_NAME"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS" "$APP_RESOURCES"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$WIDGET_MACOS"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
+cp "$BUILD_WIDGET_BINARY" "$WIDGET_BINARY"
+chmod +x "$WIDGET_BINARY"
 if [ -f "$APP_ICON" ]; then
   cp "$APP_ICON" "$APP_RESOURCES/AppIcon.icns"
 fi
@@ -84,6 +137,22 @@ fi
 /usr/libexec/PlistBuddy -c "Add :NSPrincipalClass string NSApplication" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Add :NSRemindersUsageDescription string SubPulse syncs subscription renewal tasks with Reminders." "$INFO_PLIST"
 
+/usr/libexec/PlistBuddy -c "Clear dict" "$WIDGET_INFO_PLIST" >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string $WIDGET_PRODUCT_NAME" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $WIDGET_BUNDLE_ID" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string en" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleInfoDictionaryVersion string 6.0" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleName string $WIDGET_PRODUCT_NAME" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string SubPulse" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_VERSION" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string XPC!" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleSupportedPlatforms array" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleSupportedPlatforms:0 string MacOSX" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string $MIN_SYSTEM_VERSION" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :NSExtension dict" "$WIDGET_INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :NSExtension:NSExtensionPointIdentifier string com.apple.widgetkit-extension" "$WIDGET_INFO_PLIST"
+
 xattr -cr "$APP_BUNDLE"
 xattr -d com.apple.FinderInfo "$APP_BUNDLE" >/dev/null 2>&1 || true
 xattr -d com.apple.fileprovider.fpfs#P "$APP_BUNDLE" >/dev/null 2>&1 || true
@@ -94,12 +163,15 @@ ditto --norsrc --noextattr --noacl "$APP_BUNDLE" "$SIGNED_APP_BUNDLE"
 xattr -cr "$SIGNED_APP_BUNDLE"
 xattr -d com.apple.FinderInfo "$SIGNED_APP_BUNDLE" >/dev/null 2>&1 || true
 xattr -d com.apple.fileprovider.fpfs#P "$SIGNED_APP_BUNDLE" >/dev/null 2>&1 || true
-sign_app_bundle "$SIGNED_APP_BUNDLE"
+if [ -d "$SIGNED_APP_BUNDLE/Contents/PlugIns/$WIDGET_PRODUCT_NAME.appex" ]; then
+  sign_app_bundle "$SIGNED_APP_BUNDLE/Contents/PlugIns/$WIDGET_PRODUCT_NAME.appex" "$WIDGET_ENTITLEMENTS" "nodeep"
+fi
+sign_app_bundle "$SIGNED_APP_BUNDLE" "" "nodeep"
 rm -rf "$APP_BUNDLE"
 ditto --norsrc --noextattr --noacl "$SIGNED_APP_BUNDLE" "$APP_BUNDLE"
 rm -rf "$SIGNING_DIR"
 clean_bundle_xattrs "$APP_BUNDLE"
-codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+verify_app_bundle "$APP_BUNDLE"
 echo "Built $APP_NAME $APP_VERSION ($APP_BUILD)"
 
 open_app() {
@@ -143,7 +215,7 @@ case "$MODE" in
       sleep 0.2
     done
     clean_bundle_xattrs "$APP_BUNDLE"
-    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+    verify_app_bundle "$APP_BUNDLE"
     ;;
   *)
     echo "usage: $0 [run|--build|--debug|--logs|--telemetry|--verify]" >&2

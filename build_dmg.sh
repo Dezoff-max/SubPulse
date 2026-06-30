@@ -6,6 +6,8 @@ APP_NAME="SubPulse"
 APP_PATH="$ROOT_DIR/dist/$APP_NAME.app"
 DMG_PATH="$ROOT_DIR/dist/$APP_NAME.dmg"
 APP_ICON="$ROOT_DIR/Resources/AppIcon.icns"
+WIDGET_NAME="SubPulseWidgets"
+WIDGET_ENTITLEMENTS="$ROOT_DIR/Config/SubPulseWidgets.entitlements"
 STAGE_DIR="$(mktemp -d /tmp/subpulse-dmg.XXXXXX)"
 STAGED_APP_PATH="$STAGE_DIR/$APP_NAME.app"
 DMG_ROOT="$STAGE_DIR/dmg-root"
@@ -14,10 +16,37 @@ trap 'rm -rf "$STAGE_DIR"' EXIT
 
 sign_app_bundle() {
   local bundle_path="$1"
+  local entitlements_path="${2:-}"
+  local deep_flag="${3:-deep}"
+
   if [ "$CODE_SIGN_IDENTITY" = "-" ]; then
-    codesign --force --deep --sign - "$bundle_path"
+    if [ -n "$entitlements_path" ] && [ -f "$entitlements_path" ]; then
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --sign - --entitlements "$entitlements_path" "$bundle_path"
+      else
+        codesign --force --sign - --entitlements "$entitlements_path" "$bundle_path"
+      fi
+    else
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --sign - "$bundle_path"
+      else
+        codesign --force --sign - "$bundle_path"
+      fi
+    fi
   else
-    codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+    if [ -n "$entitlements_path" ] && [ -f "$entitlements_path" ]; then
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" --entitlements "$entitlements_path" "$bundle_path"
+      else
+        codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" --entitlements "$entitlements_path" "$bundle_path"
+      fi
+    else
+      if [ "$deep_flag" = "deep" ]; then
+        codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+      else
+        codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$bundle_path"
+      fi
+    fi
   fi
 }
 
@@ -76,7 +105,10 @@ ditto --noextattr --noacl "$APP_PATH" "$STAGED_APP_PATH"
 xattr -cr "$STAGED_APP_PATH"
 xattr -d com.apple.FinderInfo "$STAGED_APP_PATH" >/dev/null 2>&1 || true
 xattr -d com.apple.fileprovider.fpfs#P "$STAGED_APP_PATH" >/dev/null 2>&1 || true
-sign_app_bundle "$STAGED_APP_PATH"
+if [ -d "$STAGED_APP_PATH/Contents/PlugIns/$WIDGET_NAME.appex" ]; then
+  sign_app_bundle "$STAGED_APP_PATH/Contents/PlugIns/$WIDGET_NAME.appex" "$WIDGET_ENTITLEMENTS" "nodeep"
+fi
+sign_app_bundle "$STAGED_APP_PATH" "" "nodeep"
 codesign --verify --deep --strict --verbose=2 "$STAGED_APP_PATH"
 
 mkdir -p "$DMG_ROOT"

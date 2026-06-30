@@ -30,6 +30,7 @@ Landing page: https://subpulse.netlify.app
 - Swift, SwiftUI, SwiftData
 - Charts
 - UserNotifications
+- WidgetKit desktop widgets
 - MVVM-oriented view models
 - SF Symbols
 - Local SwiftData storage

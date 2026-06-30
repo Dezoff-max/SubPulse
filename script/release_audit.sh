@@ -18,9 +18,12 @@ swift build -c release
 echo
 echo "== App bundle verification =="
 BUILD_CONFIGURATION=release "$ROOT_DIR/script/build_and_run.sh" --build
-xattr -rd 'com.apple.fileprovider.fpfs#P' "$APP_PATH" >/dev/null 2>&1 || true
-xattr -rd com.apple.FinderInfo "$APP_PATH" >/dev/null 2>&1 || true
-codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+VERIFY_DIR="$(mktemp -d /tmp/subpulse-release-verify.XXXXXX)"
+VERIFY_APP="$VERIFY_DIR/$APP_NAME.app"
+ditto --norsrc --noextattr --noacl "$APP_PATH" "$VERIFY_APP"
+xattr -cr "$VERIFY_APP" >/dev/null 2>&1 || true
+codesign --verify --deep --strict --verbose=2 "$VERIFY_APP"
+rm -rf "$VERIFY_DIR"
 
 echo
 echo "== DMG build and verification =="

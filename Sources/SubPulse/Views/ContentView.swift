@@ -34,6 +34,9 @@ struct ContentView: View {
     @AppStorage("appearance") private var appearance = AppAppearance.softNeumorphic.rawValue
     @AppStorage("accent") private var accent = AppAccent.pulseBlue.rawValue
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.system.rawValue
+    @AppStorage("baseCurrency") private var baseCurrency = "USD"
+    @AppStorage("roundingEnabled") private var roundingEnabled = false
+    @AppStorage("compactNumbers") private var compactNumbers = false
     @AppStorage("firstReminder") private var firstReminder = 1
     @AppStorage("secondReminder") private var secondReminder = 3
     @SceneStorage("selectedDestination") private var selectedDestinationRaw = AppDestination.dashboard.rawValue
@@ -57,6 +60,27 @@ struct ContentView: View {
                 ].joined(separator: "|")
             }
             .joined(separator: ";")
+    }
+
+    private var widgetSignature: String {
+        [
+            reminderSignature,
+            baseWidgetPreferencesSignature,
+            currencyExchange.rates.ratesToRub
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key):\($0.value)" }
+                .joined(separator: ","),
+            String(currencyExchange.rates.updatedAt?.timeIntervalSince1970 ?? 0)
+        ].joined(separator: "#")
+    }
+
+    private var baseWidgetPreferencesSignature: String {
+        [
+            baseCurrency,
+            appLanguage,
+            String(roundingEnabled),
+            String(compactNumbers)
+        ].joined(separator: "|")
     }
 
     private var selectedDestination: Binding<AppDestination?> {
@@ -181,11 +205,15 @@ struct ContentView: View {
         .onAppear {
             appearance = AppAppearance.normalizedRawValue(appearance)
             SeedService.seedIfNeeded(in: modelContext)
+            refreshWidgetSnapshot()
             Task { await rescheduleAllReminders() }
             Task { await currencyExchange.refreshIfNeeded() }
         }
         .onChange(of: reminderSignature) { _, _ in
             Task { await rescheduleAllReminders() }
+        }
+        .onChange(of: widgetSignature) { _, _ in
+            refreshWidgetSnapshot()
         }
         .onChange(of: firstReminder) { _, _ in
             Task { await rescheduleAllReminders() }
@@ -269,6 +297,7 @@ struct ContentView: View {
         if let subscriptionToSchedule {
             Task { await scheduleReminders(for: subscriptionToSchedule) }
         }
+        refreshWidgetSnapshot()
         editingSubscription = nil
         activeSheet = nil
     }
@@ -310,6 +339,7 @@ struct ContentView: View {
         for subscription in importedSubscriptions where subscription.isActive {
             Task { await scheduleReminders(for: subscription) }
         }
+        refreshWidgetSnapshot()
         activeSheet = nil
     }
 
@@ -318,9 +348,21 @@ struct ContentView: View {
         modelContext.delete(subscription)
         do {
             try modelContext.save()
+            refreshWidgetSnapshot()
         } catch {
             persistenceErrorMessage = L10n.text("deleteFailedMessage", language: appLanguage)
         }
+    }
+
+    private func refreshWidgetSnapshot() {
+        WidgetSnapshotService.write(
+            subscriptions: subscriptions,
+            baseCurrency: baseCurrency,
+            language: appLanguage,
+            rates: currencyExchange.rates,
+            compactNumbers: compactNumbers,
+            roundingEnabled: roundingEnabled
+        )
     }
 
     private func scheduleReminders(for subscription: Subscription) async {
