@@ -1,6 +1,7 @@
 import { getStore } from "@netlify/blobs";
 
 const DOWNLOADS_BASELINE = 999;
+const TOTAL_VISITORS_BASELINE = 758;
 
 function getStatsStore() {
   return getStore({
@@ -14,11 +15,15 @@ export default async () => {
   const totals = (await store.get("totals", { type: "json" })) || {
     downloads: DOWNLOADS_BASELINE,
     recentUsers: [],
-    totalVisitors: 0,
+    totalVisitors: TOTAL_VISITORS_BASELINE,
   };
 
   if (!Number.isFinite(totals.downloads) || totals.downloads < DOWNLOADS_BASELINE) {
     totals.downloads = DOWNLOADS_BASELINE;
+  }
+
+  if (!Number.isFinite(totals.totalVisitors) || totals.totalVisitors < TOTAL_VISITORS_BASELINE) {
+    totals.totalVisitors = TOTAL_VISITORS_BASELINE;
   }
 
   totals.downloads += 1;

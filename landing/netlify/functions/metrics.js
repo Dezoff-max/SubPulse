@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 
 const SESSION_TTL_MS = 90 * 1000;
 const DOWNLOADS_BASELINE = 999;
+const TOTAL_VISITORS_BASELINE = 758;
 const DEFAULT_COUNTRY_CODE = "UN";
 const DEFAULT_COUNTRY_NAME = "Unknown";
 const JSON_HEADERS = {
@@ -48,7 +49,7 @@ function publicRecentUsers(recentUsers) {
 async function readTotals(store) {
   const totals = (await store.get("totals", { type: "json" })) || {
     downloads: DOWNLOADS_BASELINE,
-    totalVisitors: 0,
+    totalVisitors: TOTAL_VISITORS_BASELINE,
     recentUsers: [],
   };
 
@@ -56,8 +57,8 @@ async function readTotals(store) {
     totals.downloads = DOWNLOADS_BASELINE;
   }
 
-  if (!Number.isFinite(totals.totalVisitors) || totals.totalVisitors < 0) {
-    totals.totalVisitors = 0;
+  if (!Number.isFinite(totals.totalVisitors) || totals.totalVisitors < TOTAL_VISITORS_BASELINE) {
+    totals.totalVisitors = TOTAL_VISITORS_BASELINE;
   }
 
   totals.recentUsers = Array.isArray(totals.recentUsers) ? totals.recentUsers.slice(0, 3) : [];
