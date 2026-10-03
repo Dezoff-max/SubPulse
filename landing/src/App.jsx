@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const content = {
   en: {
@@ -399,6 +399,28 @@ function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+const statsIds = new Map();
+
+function getStatsId(key, persistent = false) {
+  const stores = persistent ? ["localStorage", "sessionStorage"] : ["sessionStorage"];
+
+  for (const name of stores) {
+    try {
+      const storage = window[name];
+      const saved = storage.getItem(key);
+      const id = saved || statsIds.get(key) || makeId();
+      if (!saved) storage.setItem(key, id);
+      statsIds.set(key, id);
+      return id;
+    } catch {
+      // Private browsing or blocked storage must not stop live counters.
+    }
+  }
+
+  if (!statsIds.has(key)) statsIds.set(key, makeId());
+  return statsIds.get(key);
+}
+
 function useSiteStats() {
   const [stats, setStats] = useState({
     downloads: null,
@@ -406,59 +428,110 @@ function useSiteStats() {
     recentUsers: [],
     totalVisitors: null,
   });
+  const downloadRefresh = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    let visitorId = localStorage.getItem("subpulse-visitor-id");
-    let sessionId = sessionStorage.getItem("subpulse-session-id");
-
-    if (!visitorId) {
-      visitorId = makeId();
-      localStorage.setItem("subpulse-visitor-id", visitorId);
-    }
-
-    if (!sessionId) {
-      sessionId = makeId();
-      sessionStorage.setItem("subpulse-session-id", sessionId);
-    }
-
+    const visitorId = getStatsId("subpulse-visitor-id", true);
+    const sessionId = getStatsId("subpulse-session-id");
     let cancelled = false;
+    let request = null;
+    let pollTimer = null;
+    let refreshPending = false;
+    const downloadTimers = new Set();
+
+    const clearDownloadTimers = () => {
+      downloadTimers.forEach((timer) => window.clearTimeout(timer));
+      downloadTimers.clear();
+    };
 
     const ping = async () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      if (request) {
+        refreshPending = true;
+        return;
+      }
+
+      window.clearTimeout(pollTimer);
+      request = new AbortController();
+      const controller = request;
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+
       try {
         const response = await fetch("/api/metrics", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ visitorId, sessionId }),
+          cache: "no-store",
+          signal: controller.signal,
         });
 
         if (!response.ok) return;
 
         const data = await response.json();
-        if (!cancelled) {
+        if (!cancelled && !controller.signal.aborted) {
           setStats({
             downloads: data.downloads,
             online: data.online,
             recentUsers: Array.isArray(data.recentUsers) ? data.recentUsers : [],
             totalVisitors: data.totalVisitors,
+            baseline: data.baseline,
+            measured: data.measured,
           });
         }
       } catch {
-        // Static local previews do not run Netlify Functions. Production does.
+        // Keep the last confirmed values when the network is unavailable.
+      } finally {
+        window.clearTimeout(timeout);
+        request = null;
+        if (!cancelled && document.visibilityState !== "hidden") {
+          const delay = refreshPending ? 0 : 30000;
+          refreshPending = false;
+          pollTimer = window.setTimeout(ping, delay);
+        }
       }
     };
 
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        window.clearTimeout(pollTimer);
+        clearDownloadTimers();
+        refreshPending = false;
+        request?.abort();
+      } else {
+        ping();
+      }
+    };
+
+    downloadRefresh.current = () => {
+      clearDownloadTimers();
+      // The download GET records the event; only read confirmed totals here.
+      [250, 1000, 3000, 5000].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          downloadTimers.delete(timer);
+          ping();
+        }, delay);
+        downloadTimers.add(timer);
+      });
+    };
+
     ping();
-    const timer = window.setInterval(ping, 30000);
+    window.addEventListener("focus", ping);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      downloadRefresh.current = null;
+      window.clearTimeout(pollTimer);
+      clearDownloadTimers();
+      request?.abort();
+      window.removeEventListener("focus", ping);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
-  return stats;
+  return { stats, refreshAfterDownload: () => downloadRefresh.current?.() };
 }
 
 function formatStat(value, language) {
@@ -467,8 +540,33 @@ function formatStat(value, language) {
   return new Intl.NumberFormat(language === "ru" ? "ru-RU" : "en-US").format(value);
 }
 
+function siteStatsTitles(stats, language) {
+  const downloadsBase = formatStat(stats.baseline?.downloads ?? 1239, language);
+  const visitorsBase = formatStat(stats.baseline?.totalVisitors ?? 758, language);
+  const measuredDownloads = Number.isFinite(stats.measured?.downloads)
+    ? formatStat(stats.measured.downloads, language) : null;
+  const measuredVisitors = Number.isFinite(stats.measured?.totalVisitors)
+    ? formatStat(stats.measured.totalVisitors, language) : null;
+
+  if (language === "ru") {
+    return {
+      downloads: `Начальная база ${downloadsBase} + новые запросы скачивания${measuredDownloads === null ? "" : `: ${measuredDownloads}`}. Это запросы файла, а не подтверждённые установки.`,
+      online: "Уникальные браузеры, активные за последние 90 секунд. Скрытые вкладки не отправляют сигналы активности.",
+      recentUsers: "Страны последних посетителей по геоданным соединения. Если страна неизвестна, показан глобус.",
+      totalVisitors: `Историческая начальная база ${visitorsBase} + учтённые уникальные браузеры${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. Это браузеры, а не авторизованные люди; очистка хранилища создаёт новый идентификатор.`,
+    };
+  }
+
+  return {
+    downloads: `Initial baseline ${downloadsBase} + newly recorded download requests${measuredDownloads === null ? "" : `: ${measuredDownloads}`}. These are file requests, not confirmed installations.`,
+    online: "Unique browsers active in the last 90 seconds. Hidden tabs do not send activity heartbeats.",
+    recentUsers: "Recent visitors' countries from connection geolocation. A globe means the country is unknown.",
+    totalVisitors: `Legacy initial baseline ${visitorsBase} + recorded unique browsers${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. These are browsers, not authenticated people; clearing storage creates a new identifier.`,
+  };
+}
+
 function countryFlag(countryCode) {
-  if (typeof countryCode !== "string" || !/^[A-Z]{2}$/.test(countryCode)) return "🌐";
+  if (typeof countryCode !== "string" || !/^[A-Z]{2}$/.test(countryCode) || ["UN", "XX", "ZZ"].includes(countryCode)) return "🌐";
 
   return countryCode
     .split("")
@@ -476,14 +574,16 @@ function countryFlag(countryCode) {
     .join("");
 }
 
-function recentUserFlags(users) {
+function recentUserFlags(users, language) {
   const flags = users.slice(0, 3).map((user) => ({
     flag: countryFlag(user.countryCode),
-    label: user.countryName || user.countryCode || "Unknown",
+    label: countryFlag(user.countryCode) === "🌐"
+      ? (language === "ru" ? "Страна не определена" : "Country unknown")
+      : user.countryName || user.countryCode,
   }));
 
   while (flags.length < 3) {
-    flags.push({ flag: "•", label: "Waiting for visitor" });
+    flags.push({ flag: "•", label: language === "ru" ? "Ожидание посетителя" : "Waiting for visitor" });
   }
 
   return flags;
@@ -494,7 +594,8 @@ export default function App() {
   const [language, setLanguage] = useLanguage();
   const [active, setActive] = useState(0);
   const [selectedShot, setSelectedShot] = useState(null);
-  const siteStats = useSiteStats();
+  const { stats: siteStats, refreshAfterDownload } = useSiteStats();
+  const statsTitles = siteStatsTitles(siteStats, language);
   const t = content[language] || content.en;
 
   useScrollReveal(language);
@@ -578,7 +679,7 @@ export default function App() {
           <h1>{t.heroTitle}</h1>
           <p>{t.heroText}</p>
           <div className="hero-actions">
-            <a className="primary-action" href="/api/download">
+            <a className="primary-action" href="/api/download" onClick={refreshAfterDownload}>
               {t.primaryCta}
             </a>
             <a className="secondary-action" href="#interface">
@@ -713,7 +814,7 @@ export default function App() {
         </div>
         <h2>{t.downloadTitle}</h2>
         <p>{t.downloadText}</p>
-        <a className="primary-action" href="/api/download">
+        <a className="primary-action" href="/api/download" onClick={refreshAfterDownload}>
           {t.downloadCta}
         </a>
       </section>
@@ -731,17 +832,17 @@ export default function App() {
         <div className="footer-main">
           <span>SubPulse</span>
           <div className="site-stats" aria-label={t.statsLabel}>
-            <span>
+            <span title={statsTitles.downloads}>
               <strong>{formatStat(siteStats.downloads, language)}</strong>
               <small>{t.stats.downloads}</small>
             </span>
-            <span>
+            <span title={statsTitles.online}>
               <strong>{formatStat(siteStats.online, language)}</strong>
               <small>{t.stats.online}</small>
             </span>
-            <span className="recent-users-card">
+            <span className="recent-users-card" title={statsTitles.recentUsers}>
               <strong className="recent-flags" aria-label={t.stats.recentUsers}>
-                {recentUserFlags(siteStats.recentUsers).map((user, index) => (
+                {recentUserFlags(siteStats.recentUsers, language).map((user, index) => (
                   <b key={`${user.label}-${index}`} title={user.label}>
                     {user.flag}
                   </b>
@@ -749,7 +850,7 @@ export default function App() {
               </strong>
               <small>{t.stats.recentUsers}</small>
             </span>
-            <span>
+            <span title={statsTitles.totalVisitors}>
               <strong>{formatStat(siteStats.totalVisitors, language)}</strong>
               <small>{t.stats.totalVisitors}</small>
             </span>

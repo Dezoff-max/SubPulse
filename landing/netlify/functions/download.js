@@ -1,37 +1,26 @@
-import { getStore } from "@netlify/blobs";
+import { getStatsStore, isAutomatedRequest, recordDownload, json } from "../lib/stats.js";
 
-const DOWNLOADS_BASELINE = 999;
-const TOTAL_VISITORS_BASELINE = 758;
-
-function getStatsStore() {
-  return getStore({
-    name: "subpulse-stats",
-    consistency: "strong",
+export default async (req, context) => {
+  if (!["GET", "HEAD"].includes(req.method)) {
+    return json({ error: "Method not allowed" }, 405, { Allow: "GET, HEAD" });
+  }
+  if (req.method === "GET" && !isAutomatedRequest(req)) {
+    try {
+      // Every request has its own key: concurrent visits cannot overwrite it.
+      await recordDownload(getStatsStore(context), context?.requestId);
+    } catch {
+      // An analytics outage must never prevent the actual download.
+      console.error("Unable to record a SubPulse download request");
+    }
+  }
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: new URL("/downloads/SubPulse.dmg", req.url).href,
+      "Cache-Control": "no-store, max-age=0",
+      "Netlify-CDN-Cache-Control": "no-store",
+    },
   });
-}
-
-export default async () => {
-  const store = getStatsStore();
-  const totals = (await store.get("totals", { type: "json" })) || {
-    downloads: DOWNLOADS_BASELINE,
-    recentUsers: [],
-    totalVisitors: TOTAL_VISITORS_BASELINE,
-  };
-
-  if (!Number.isFinite(totals.downloads) || totals.downloads < DOWNLOADS_BASELINE) {
-    totals.downloads = DOWNLOADS_BASELINE;
-  }
-
-  if (!Number.isFinite(totals.totalVisitors) || totals.totalVisitors < TOTAL_VISITORS_BASELINE) {
-    totals.totalVisitors = TOTAL_VISITORS_BASELINE;
-  }
-
-  totals.downloads += 1;
-  await store.setJSON("totals", totals);
-
-  return Response.redirect("https://subpulse.netlify.app/downloads/SubPulse.dmg", 302);
 };
 
-export const config = {
-  path: "/api/download",
-};
+export const config = { path: "/api/download" };
