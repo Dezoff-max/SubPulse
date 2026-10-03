@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getStore, getDeployStore } from "@netlify/blobs";
 
 export const DOWNLOADS_BASELINE = 1239;
-export const VISITORS_BASELINE = 758;
+export const VISITORS_BASELINE = DOWNLOADS_BASELINE;
 export const SESSION_TTL_MS = 90_000;
 
 export function getStatsStore(context) {

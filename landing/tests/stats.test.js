@@ -45,10 +45,10 @@ test("empty store discloses the configured bases separately from measured events
   const store = new AsyncMemoryStore();
   const stats = await readStats(store, NOW);
   assert.equal(DOWNLOADS_BASELINE, 1239);
-  assert.equal(VISITORS_BASELINE, 758);
+  assert.equal(VISITORS_BASELINE, DOWNLOADS_BASELINE);
   assert.equal(stats.downloads, 1239);
-  assert.equal(stats.totalVisitors, 758);
-  assert.deepEqual(stats.baseline, { downloads: 1239, totalVisitors: 758 });
+  assert.equal(stats.totalVisitors, 1239);
+  assert.deepEqual(stats.baseline, { downloads: 1239, totalVisitors: 1239 });
   assert.deepEqual(stats.measured, { downloads: 0, totalVisitors: 0 });
   assert.equal(stats.online, 0);
   assert.deepEqual(stats.recentUsers, []);
@@ -70,7 +70,7 @@ test("20 concurrent downloads and heartbeats retain every download and never ove
   ])));
   const stats = await readStats(store, NOW);
   assert.equal(stats.downloads, 1320);
-  assert.equal(stats.totalVisitors, 781);
+  assert.equal(stats.totalVisitors, 1262);
   assert.equal(stats.online, 20);
   assert.deepEqual(stats.measured, { downloads: 20, totalVisitors: 23 });
   assert.deepEqual(await store.get("totals"), legacy);
@@ -82,7 +82,7 @@ test("concurrent first visits, tabs and repeated heartbeats count one visitor an
   await Promise.all(Array.from({ length: 20 }, () => recordVisit(store, "same-visitor-123", CONTEXT, NOW)));
   await recordVisit(store, "same-visitor-123", CONTEXT, NOW + 30_000);
   const stats = await readStats(store, NOW + 30_000);
-  assert.equal(stats.totalVisitors, 759);
+  assert.equal(stats.totalVisitors, 1240);
   assert.equal(stats.measured.totalVisitors, 1);
   assert.equal(stats.online, 1);
   assert.equal(stats.downloads, 1239);
@@ -107,7 +107,7 @@ test("online TTL excludes expired, future and invalid timestamps without deletin
   const beforeWrites = store.writes.length;
   const stats = await readStats(store, NOW);
   assert.equal(stats.online, 2);
-  assert.equal(stats.totalVisitors, 762);
+  assert.equal(stats.totalVisitors, 1243);
   assert.equal((await store.list({ prefix: "presence-v2/" })).blobs.length, 5);
   assert.equal(store.writes.length, beforeWrites);
   assert.equal((await readStats(store, NOW + SESSION_TTL_MS + 2)).online, 0);

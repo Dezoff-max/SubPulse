@@ -542,7 +542,7 @@ function formatStat(value, language) {
 
 function siteStatsTitles(stats, language) {
   const downloadsBase = formatStat(stats.baseline?.downloads ?? 1239, language);
-  const visitorsBase = formatStat(stats.baseline?.totalVisitors ?? 758, language);
+  const visitorsBase = formatStat(stats.baseline?.totalVisitors ?? 1239, language);
   const measuredDownloads = Number.isFinite(stats.measured?.downloads)
     ? formatStat(stats.measured.downloads, language) : null;
   const measuredVisitors = Number.isFinite(stats.measured?.totalVisitors)
@@ -553,7 +553,7 @@ function siteStatsTitles(stats, language) {
       downloads: `Начальная база ${downloadsBase} + новые запросы скачивания с кнопок сайта${measuredDownloads === null ? "" : `: ${measuredDownloads}`}. Это запросы файла, а не подтверждённые установки.`,
       online: "Уникальные браузеры, активные за последние 90 секунд. Скрытые вкладки не отправляют сигналы активности.",
       recentUsers: "Страны последних посетителей по геоданным соединения. Если страна неизвестна, показан глобус.",
-      totalVisitors: `Историческая начальная база ${visitorsBase} + учтённые уникальные браузеры${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. Это браузеры, а не авторизованные люди; очистка хранилища создаёт новый идентификатор.`,
+      totalVisitors: `Начальная база ${visitorsBase} + учтённые уникальные браузеры${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. Это браузеры, а не авторизованные люди; очистка хранилища создаёт новый идентификатор.`,
     };
   }
 
@@ -561,7 +561,7 @@ function siteStatsTitles(stats, language) {
     downloads: `Initial baseline ${downloadsBase} + user-initiated download requests from this site${measuredDownloads === null ? "" : `: ${measuredDownloads}`}. These are file requests, not confirmed installations.`,
     online: "Unique browsers active in the last 90 seconds. Hidden tabs do not send activity heartbeats.",
     recentUsers: "Recent visitors' countries from connection geolocation. A globe means the country is unknown.",
-    totalVisitors: `Legacy initial baseline ${visitorsBase} + recorded unique browsers${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. These are browsers, not authenticated people; clearing storage creates a new identifier.`,
+    totalVisitors: `Initial baseline ${visitorsBase} + recorded unique browsers${measuredVisitors === null ? "" : `: ${measuredVisitors}`}. These are browsers, not authenticated people; clearing storage creates a new identifier.`,
   };
 }
 
