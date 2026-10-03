@@ -30,6 +30,16 @@ export function isAutomatedRequest(req) {
     /prefetch|prerender/i.test(`${req.headers.get("purpose") || ""} ${req.headers.get("sec-purpose") || ""}`);
 }
 
+export function isDownloadNavigation(req) {
+  // Netlify normalizes HEAD to GET. Fetch Metadata identifies an actual
+  // user-activated document navigation instead of a background link check.
+  return req.method === "GET" &&
+    req.headers.get("sec-fetch-mode") === "navigate" &&
+    req.headers.get("sec-fetch-dest") === "document" &&
+    (!req.headers.has("sec-fetch-user") || req.headers.get("sec-fetch-user") === "?1") &&
+    !isAutomatedRequest(req);
+}
+
 function country(context) {
   const code = context?.geo?.country?.code;
   return {

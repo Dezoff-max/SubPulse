@@ -47,6 +47,8 @@ https://subpulse.netlify.app
 
 The landing page includes Netlify Functions and Netlify Blobs counters for downloads, online visitors, and total visitors.
 
+Download statistics count browser navigation requests to `/api/download`, such as clicks on the site's download buttons, rather than completed transfers or installations. Requests must carry `Sec-Fetch-Mode: navigate` and `Sec-Fetch-Dest: document`; `Sec-Fetch-User` is optional for browser compatibility, but must be `?1` when present. HEAD probes, recognized bots, prefetches, download managers, and browsers without navigation metadata are excluded from statistics; they still receive the download redirect. The counter discloses its configured initial baseline separately from newly recorded requests.
+
 ## Open in Xcode
 
 1. Open Xcode 15 or newer.

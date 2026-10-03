@@ -5,6 +5,7 @@ import {
   DOWNLOADS_BASELINE,
   VISITORS_BASELINE,
   SESSION_TTL_MS,
+  isDownloadNavigation,
   readStats,
   recordDownload,
   recordVisit,
@@ -129,9 +130,38 @@ test("recent countries retain legacy history, deduplicate visitors and omit priv
   assert.equal(stats.recentUsers.some((user) => "id" in user), false);
 });
 
-test("HEAD download and automated prefetch redirect without requiring or incrementing a stats store", async () => {
+test("download navigation accepts browser link clicks including Safari without Sec-Fetch-User", () => {
+  const headers = { "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document", "Sec-Fetch-User": "?1" };
+  assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { headers })), true);
+  const safariHeaders = { "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document" };
+  assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { headers: safariHeaders })), true);
+  for (const missing of ["Sec-Fetch-Mode", "Sec-Fetch-Dest"]) {
+    const incomplete = { ...headers };
+    delete incomplete[missing];
+    assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { headers: incomplete })), false, missing);
+  }
+  for (const override of [
+    { "Sec-Fetch-Mode": "cors" },
+    { "Sec-Fetch-Dest": "empty" },
+    { "Sec-Fetch-User": "?0" },
+    { "Sec-Fetch-User": "" },
+    { "User-Agent": "Googlebot" },
+    { "Purpose": "prefetch" },
+    { "Sec-Purpose": "prefetch;prerender" },
+  ]) {
+    assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { headers: { ...headers, ...override } })), false, JSON.stringify(override));
+  }
+  assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { method: "HEAD", headers })), false);
+  // Netlify can forward a real HEAD probe as GET; it still has no browser
+  // navigation metadata and must not become an apparent download.
+  assert.equal(isDownloadNavigation(new Request("https://example.test/api/download", { headers: { "User-Agent": "curl/8.0" } })), false);
+});
+
+test("HEAD, normalized HEAD-as-GET and automated prefetch redirect without accessing a stats store", async (t) => {
+  const errorLog = t.mock.method(console, "error", () => {});
   const requests = [
     new Request("https://example.test/api/download", { method: "HEAD" }),
+    new Request("https://example.test/api/download"),
     new Request("https://example.test/api/download", { headers: { "User-Agent": "Googlebot" } }),
     new Request("https://example.test/api/download", { headers: { "Sec-Purpose": "prefetch" } }),
   ];
@@ -143,6 +173,7 @@ test("HEAD download and automated prefetch redirect without requiring or increme
     assert.equal(response.headers.get("Netlify-CDN-Cache-Control"), "no-store");
     assert.equal(await response.text(), "");
   }
+  assert.equal(errorLog.mock.callCount(), 0, "untracked requests must not attempt to initialize a missing stats store");
 });
 
 test("unsupported endpoint methods are rejected before connecting to the stats store", async () => {
